@@ -1,0 +1,28 @@
+# Central pipeline configuration.
+# Ingestion reads this file directly; dbt (phase 2) mirrors the uoa block as vars.
+
+tickers:
+  - AAPL
+  - NVDA
+  - TSLA
+  - AMD
+  - MSFT
+  - META
+  - AMZN
+  - GOOGL
+  - SPY
+  - QQQ
+
+options:
+  # Only ingest expirations within this many calendar days. Keeps free-tier
+  # storage manageable while covering the near-dated flow UOA cares about.
+  max_expiration_days: 45
+  # Only keep contracts with strikes within +/- this fraction of spot.
+  # UOA rule uses +/-10%; we ingest +/-20% so skew analysis is possible later.
+  strike_window_pct: 0.20
+
+uoa:
+  # Flag when NTM volume >= volume_multiple * trailing baseline AND volume > open interest.
+  ntm_pct: 0.10
+  baseline_days: 10
+  volume_multiple: 3.0

@@ -1,0 +1,41 @@
+name: ingest-options
+
+on:
+  schedule:
+    # 21:30 UTC = 17:30 ET (16:30 during DST) — after the close, when EOD
+    # option volume is settled. GH Actions cron can fire late; that's fine
+    # for an EOD snapshot, and loads are idempotent upserts anyway.
+    - cron: "30 21 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Run even if the market was closed"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ingest-options
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Ingest options chains
+        env:
+          TRADIER_TOKEN: ${{ secrets.TRADIER_TOKEN }}
+          TRADIER_ENV: sandbox
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: >-
+          python -m ingestion.ingest_options
+          ${{ github.event_name == 'workflow_dispatch' && inputs.force && '--force' || '' }}
