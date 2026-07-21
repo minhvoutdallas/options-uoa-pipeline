@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: stg_options__contracts
+    description: One typed row per option contract per snapshot day.
+    columns:
+      - name: contract_symbol
+        tests: [not_null]
+      - name: option_type
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["call", "put"]
+      - name: strike
+        tests: [not_null]
+      - name: volume
+        tests: [not_null]
+      - name: open_interest
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [snapshot_date, contract_symbol]
+
+  - name: stg_options__underlying_quotes
+    description: One typed row per underlying per snapshot day.
+    columns:
+      - name: symbol
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [snapshot_date, symbol]
+
+  - name: stg_fundamentals
+    description: One typed row per symbol per weekly fundamentals snapshot.
+    columns:
+      - name: symbol
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [snapshot_date, symbol]

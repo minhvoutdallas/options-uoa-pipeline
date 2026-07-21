@@ -27,6 +27,16 @@ CREATE TABLE IF NOT EXISTS raw.option_chains (
     PRIMARY KEY (snapshot_date, underlying, expiration)
 );
 
+-- One row per ticker per weekly run: trimmed yfinance company snapshot
+-- (see ingestion/ingest_fundamentals.py for the field list).
+CREATE TABLE IF NOT EXISTS raw.fundamentals (
+    snapshot_date  date        NOT NULL,
+    symbol         text        NOT NULL,
+    payload        jsonb       NOT NULL,
+    ingested_at    timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (snapshot_date, symbol)
+);
+
 -- Lightweight run log for observability: one row per job invocation.
 CREATE TABLE IF NOT EXISTS raw.ingest_runs (
     run_id        bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

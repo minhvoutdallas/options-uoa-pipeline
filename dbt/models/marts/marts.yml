@@ -1,0 +1,38 @@
+version: 2
+
+models:
+  - name: fct_option_activity
+    description: >
+      Daily rollup of option volume/OI per (day, underlying, call/put side),
+      over the full ingested strike window plus a near-the-money slice.
+    columns:
+      - name: ntm_volume
+        tests: [not_null]
+      - name: ntm_open_interest
+        tests: [not_null]
+      - name: option_type
+        tests:
+          - accepted_values:
+              values: ["call", "put"]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [snapshot_date, underlying, option_type]
+
+  - name: fct_uoa_flags
+    description: >
+      fct_option_activity with the trailing baseline attached and the UOA rule
+      evaluated. is_uoa is null-safe false until the baseline window fills.
+    columns:
+      - name: is_uoa
+        tests: [not_null]
+      - name: volume_ratio
+        description: ntm_volume / trailing baseline; null until baseline exists.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [snapshot_date, underlying, option_type]
+
+  - name: dim_company
+    description: Latest fundamentals per ticker with next known earnings date.
+    columns:
+      - name: symbol
+        tests: [unique, not_null]

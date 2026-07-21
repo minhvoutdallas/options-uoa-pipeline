@@ -55,6 +55,20 @@ def upsert_chain(
     )
 
 
+def upsert_fundamentals(
+    conn: psycopg.Connection, snapshot_date: date, symbol: str, payload: dict
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO raw.fundamentals (snapshot_date, symbol, payload)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (snapshot_date, symbol)
+        DO UPDATE SET payload = EXCLUDED.payload, ingested_at = now()
+        """,
+        (snapshot_date, symbol, json.dumps(payload)),
+    )
+
+
 def start_run(conn: psycopg.Connection, job: str, snapshot_date: date) -> int:
     row = conn.execute(
         """

@@ -1,0 +1,28 @@
+# dbt project for the options UOA pipeline.
+# Reads the raw schema loaded by ingestion/, never writes back to it.
+
+name: options_uoa
+version: "1.0.0"
+profile: options_uoa
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+
+target-path: target
+clean-targets: ["target", "dbt_packages"]
+
+# These mirror the `uoa` block in config/pipeline.yml (ingestion reads that
+# file, dbt reads these). tests/test_config_sync.py asserts they stay in sync.
+vars:
+  ntm_pct: 0.10
+  uoa_baseline_days: 10
+  uoa_volume_multiple: 3.0
+
+models:
+  options_uoa:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts

@@ -16,3 +16,4 @@ dbt/dbt_packages/
 .idea/
 .vscode/
 Thumbs.db
+dbt/.user.yml

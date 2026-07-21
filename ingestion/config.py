@@ -33,14 +33,14 @@ class Settings:
     database_url: str = field(repr=False)
 
 
-def load_settings(config_path: Path = CONFIG_PATH) -> Settings:
+def load_settings(config_path: Path = CONFIG_PATH, require_tradier: bool = True) -> Settings:
     load_dotenv(PROJECT_ROOT / ".env")
 
     with open(config_path, encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
 
-    token = os.environ.get("TRADIER_TOKEN")
-    if not token:
+    token = os.environ.get("TRADIER_TOKEN", "")
+    if require_tradier and not token:
         raise RuntimeError("TRADIER_TOKEN is not set (see .env.example)")
 
     database_url = os.environ.get("DATABASE_URL")

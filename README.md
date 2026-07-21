@@ -60,11 +60,28 @@ day ingestion starts** — the 10-day UOA baseline goes live after ~2 weeks of r
 ```
 config/pipeline.yml     tickers + all tunable thresholds
 db/schema.sql           raw schema DDL (idempotent, applied at job start)
-ingestion/              Python ingestion jobs (Tradier client, Neon loader)
-tests/                  pytest unit tests for parsing/filtering logic
-.github/workflows/      scheduled ingestion (cron + manual dispatch)
-dbt/                    (phase 2) staging + marts models, tests, docs
+ingestion/              Python ingestion jobs (Tradier chains, yfinance fundamentals)
+dbt/                    staging views + marts tables, data tests, source freshness
+scripts/run_dbt.py      dbt wrapper that derives credentials from DATABASE_URL
+tests/                  pytest unit tests (parsing logic + config-drift guard)
+.github/workflows/      daily ingest+dbt cron, weekly fundamentals cron
 ```
+
+## The model layer
+
+dbt reads `raw` and builds two schemas in the same Neon database:
+
+- **staging** (views) — JSONB typed into columns. `stg_options__contracts` is one
+  row per contract per day; it's the only place the JSONB-parse cost is paid.
+- **marts** (tables) —
+  - `fct_option_activity`: daily NTM volume/OI rollup per (ticker, call/put side)
+  - `fct_uoa_flags`: the UOA rule evaluated against the trailing baseline. *All*
+    rows are kept (flagged or not) so dashboards can chart volume vs baseline.
+  - `dim_company`: latest fundamentals per ticker + next earnings date — the
+    context overlay for reading a flag (pre-earnings flow ≠ quiet-week flow).
+
+The UOA thresholds are mirrored as vars in `dbt/dbt_project.yml`;
+`tests/test_config_sync.py` fails if they ever drift from `config/pipeline.yml`.
 
 ## Running locally
 
@@ -75,6 +92,11 @@ pip install -r requirements-dev.txt
 copy .env.example .env          # then fill in TRADIER_TOKEN and DATABASE_URL
 pytest                          # unit tests, no credentials needed
 python -m ingestion.ingest_options --force   # full run against your Neon db
+python -m ingestion.ingest_fundamentals      # weekly fundamentals snapshot
+
+pip install -r dbt/requirements.txt
+python scripts/run_dbt.py deps  # once — installs dbt_utils
+python scripts/run_dbt.py build # staging + marts + data tests
 ```
 
 ## Deploying
@@ -83,6 +105,8 @@ python -m ingestion.ingest_options --force   # full run against your Neon db
 2. Create a free [Neon](https://neon.com) project → copy the pooled connection string.
 3. Push this repo to GitHub and add two **Actions secrets**: `TRADIER_TOKEN`, `DATABASE_URL`.
 4. Trigger the `ingest-options` workflow manually once (Actions tab → Run workflow) to verify, then let the cron take over.
+5. Trigger `ingest-fundamentals` manually once too — otherwise `dim_company`
+   stays empty until the first Saturday cron.
 
 ## Design decisions
 
@@ -100,6 +124,6 @@ python -m ingestion.ingest_options --force   # full run against your Neon db
 ## Roadmap
 
 - [x] **Phase 1 — Ingestion**: Tradier → Neon raw, scheduled + idempotent
-- [ ] **Phase 2 — Modeling**: dbt staging/marts, UOA flag logic, source freshness tests; weekly fundamentals (yfinance)
+- [x] **Phase 2 — Modeling**: dbt staging/marts, UOA flag logic, source freshness tests; weekly fundamentals (yfinance)
 - [ ] **Phase 3 — Serving**: Grafana dashboards + Discord alert on new UOA flags
 - [ ] **Phase 4 — Hardening**: dbt build in CI on PRs (Neon branch per PR), dbt docs on GitHub Pages, 90-day raw retention job
