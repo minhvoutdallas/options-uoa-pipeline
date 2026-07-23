@@ -1,0 +1,65 @@
+name: deploy-dashboard
+
+# Rebuilds the static UOA dashboard from the freshly-modeled marts and publishes
+# it to GitHub Pages. Chained off ingest-options so the page refreshes right
+# after each daily snapshot + dbt build; also runnable on demand.
+on:
+  workflow_run:
+    workflows: ["ingest-options"]
+    types: [completed]
+  workflow_dispatch:
+
+# Pages deployment needs these; id-token is for the deploy-pages OIDC handshake.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never run two Pages deploys at once; let an in-flight one finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # On the chained trigger, only publish when the ingest actually succeeded.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt -r dbt/requirements.txt
+
+      - name: Build dashboard from marts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/build_dashboard.py
+
+      - name: Generate dbt documentation
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python scripts/run_dbt.py deps
+          python scripts/run_dbt.py docs generate
+          mkdir -p dashboard/dist/dbt
+          cp -R dbt/target/. dashboard/dist/dbt/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dashboard/dist
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

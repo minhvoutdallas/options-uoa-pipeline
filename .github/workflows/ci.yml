@@ -1,0 +1,63 @@
+name: ci
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q
+
+  dbt-build:
+    # Pull requests from forks cannot access the Neon API secret.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt -r dbt/requirements.txt
+
+      - name: Create isolated Neon branch
+        id: create
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: ci-pr-${{ github.event.pull_request.number || github.run_id }}
+
+      - name: Build and test dbt project
+        env:
+          DATABASE_URL: ${{ steps.create.outputs.db_url_pooled }}
+        run: |
+          python scripts/run_dbt.py deps
+          python scripts/run_dbt.py build
+
+      - name: Delete Neon branch
+        if: always() && steps.create.outputs.branch_id != ''
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: ${{ steps.create.outputs.branch_id }}

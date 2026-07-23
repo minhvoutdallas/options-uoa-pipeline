@@ -1,0 +1,463 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Near-the-money options activity, rolling baselines, UOA flags, and pipeline health.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "neon-uoa"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "neon-uoa"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select count(*)::double precision as \"Active UOA flags\" from marts.fct_uoa_flags where snapshot_date = (select max(snapshot_date) from marts.fct_uoa_flags) and is_uoa",
+          "refId": "A"
+        }
+      ],
+      "title": "Active UOA Flags",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "neon-uoa"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "neon-uoa"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select sum(ntm_volume)::double precision as \"Latest NTM volume\" from marts.fct_uoa_flags where snapshot_date = (select max(snapshot_date) from marts.fct_uoa_flags)",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest NTM Volume",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "neon-uoa"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "neon-uoa"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select (sum(ntm_volume) filter (where option_type = 'put') / nullif(sum(ntm_volume) filter (where option_type = 'call'), 0))::double precision as \"Put / Call\" from marts.fct_uoa_flags where snapshot_date = (select max(snapshot_date) from marts.fct_uoa_flags)",
+          "refId": "A"
+        }
+      ],
+      "title": "Put / Call Volume",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "neon-uoa"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "neon-uoa"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select max(snapshot_date)::text as \"Latest snapshot\" from marts.fct_uoa_flags",
+          "refId": "A"
+        }
+      ],
+      "title": "Data Freshness",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "neon-uoa"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 14,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 16,
+        "x": 0,
+        "y": 4
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "neon-uoa"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "select snapshot_date::timestamp as time, sum(ntm_volume) filter (where option_type = 'call')::double precision as calls, sum(ntm_volume) filter (where option_type = 'put')::double precision as puts from marts.fct_uoa_flags where underlying in (${ticker:sqlstring}) and $__timeFilter(snapshot_date::timestamp) group by snapshot_date order by snapshot_date",
+          "refId": "A"
+        }
+      ],
+      "title": "NTM Volume — $ticker",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "neon-uoa"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 2
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "x"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 16,
+        "y": 4
+      },
+      "id": 6,
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "neon-uoa"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select underlying || ' ' || upper(option_type) as side, volume_ratio::double precision as ratio from marts.fct_uoa_flags where snapshot_date = (select max(snapshot_date) from marts.fct_uoa_flags) order by volume_ratio desc nulls last",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest Volume / Baseline",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "neon-uoa"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 0,
+        "y": 13
+      },
+      "id": 7,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "neon-uoa"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select snapshot_date as \"Date\", underlying as \"Ticker\", upper(option_type) as \"Side\", ntm_volume as \"NTM volume\", ntm_open_interest as \"Open interest\", round(baseline_ntm_volume) as \"Baseline\", round(volume_ratio, 2) as \"Ratio\" from marts.fct_uoa_flags where is_uoa order by snapshot_date desc, volume_ratio desc limit 50",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent UOA Flags",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "neon-uoa"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 13
+      },
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "neon-uoa"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select job as \"Job\", snapshot_date as \"Snapshot\", status as \"Status\", started_at as \"Started\", finished_at - started_at as \"Duration\" from raw.ingest_runs order by started_at desc limit 12",
+          "refId": "A"
+        }
+      ],
+      "title": "Pipeline Health",
+      "type": "table"
+    }
+  ],
+  "refresh": "30m",
+  "schemaVersion": 41,
+  "tags": [
+    "options",
+    "uoa",
+    "neon"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": null,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "neon-uoa"
+        },
+        "definition": "select distinct underlying from marts.fct_uoa_flags order by 1",
+        "includeAll": true,
+        "label": "Ticker",
+        "multi": true,
+        "name": "ticker",
+        "options": [],
+        "query": "select distinct underlying from marts.fct_uoa_flags order by 1",
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Options UOA Monitor",
+  "uid": "options-uoa",
+  "version": 1,
+  "weekStart": ""
+}

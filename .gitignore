@@ -12,6 +12,9 @@ dbt/target/
 dbt/logs/
 dbt/dbt_packages/
 
+# dashboard (phase 3) — generated at build time, published to Pages
+dashboard/dist/
+
 # IDE / OS
 .idea/
 .vscode/

@@ -6,7 +6,8 @@ activity (UOA)** on a dashboard.
 
 Built as an analytics-engineering portfolio project: real external APIs, an ELT
 warehouse pattern (raw → staging → marts), scheduled orchestration, tests at both
-the Python and SQL layer, and dashboards with alerting — all on free tiers.
+the Python and SQL layer, two dashboards, and Discord alerting — all on free
+tiers.
 
 ## Architecture
 
@@ -15,8 +16,9 @@ GitHub Actions (cron, 21:30 UTC weekdays)
  ├─ ingestion/ingest_options.py ──> Tradier API (chains + quotes) ──┐
  ├─ ingestion/ingest_fundamentals.py (weekly) ──> Yahoo Finance ────┼──> Neon Postgres: raw schema
  └─ dbt build ──> staging ──> marts (fct_option_activity, fct_uoa_flags)
-                                        │
-                          Grafana Cloud ┴── dashboards + UOA alert ──> Discord
+                                        ├──> static HTML + dbt docs ──> GitHub Pages
+                                        ├──> Grafana Cloud dashboard
+                                        └──> idempotent UOA alert ──> Discord
 ```
 
 | Layer | Tool | Free tier used |
@@ -26,7 +28,7 @@ GitHub Actions (cron, 21:30 UTC weekdays)
 | Warehouse | [Neon](https://neon.com) serverless Postgres | 0.5 GB storage, scale-to-zero |
 | Orchestration | GitHub Actions cron | 2,000 min/month |
 | Transform | dbt Core | open source |
-| Dashboard | Grafana Cloud | 3 users, alerting included |
+| Dashboards | GitHub Pages + Grafana Cloud | static public snapshot + live SQL exploration |
 
 ## The UOA rule
 
@@ -63,8 +65,12 @@ db/schema.sql           raw schema DDL (idempotent, applied at job start)
 ingestion/              Python ingestion jobs (Tradier chains, yfinance fundamentals)
 dbt/                    staging views + marts tables, data tests, source freshness
 scripts/run_dbt.py      dbt wrapper that derives credentials from DATABASE_URL
+scripts/build_dashboard.py  self-contained static dashboard builder
+scripts/send_uoa_alerts.py  idempotent Discord UOA notifications
+scripts/prune_raw.py         90-day raw snapshot retention
+grafana/                dashboard JSON + repeatable API deployment
 tests/                  pytest unit tests (parsing logic + config-drift guard)
-.github/workflows/      daily ingest+dbt cron, weekly fundamentals cron
+.github/workflows/      ingestion, CI, serving, docs, Grafana, and retention
 ```
 
 ## The model layer
@@ -97,6 +103,7 @@ python -m ingestion.ingest_fundamentals      # weekly fundamentals snapshot
 pip install -r dbt/requirements.txt
 python scripts/run_dbt.py deps  # once — installs dbt_utils
 python scripts/run_dbt.py build # staging + marts + data tests
+python scripts/build_dashboard.py
 ```
 
 ## Deploying
@@ -107,6 +114,38 @@ python scripts/run_dbt.py build # staging + marts + data tests
 4. Trigger the `ingest-options` workflow manually once (Actions tab → Run workflow) to verify, then let the cron take over.
 5. Trigger `ingest-fundamentals` manually once too — otherwise `dim_company`
    stays empty until the first Saturday cron.
+6. In repository Settings → Pages, choose **GitHub Actions** as the source. The
+   `deploy-dashboard` workflow publishes the static dashboard at `/` and dbt
+   documentation at `/dbt/` after each successful options run.
+
+### Discord alerts
+
+Create a Discord channel webhook and add it as the repository secret
+`DISCORD_WEBHOOK_URL`. The daily workflow sends each latest-snapshot UOA flag
+once and records successful deliveries in `raw.uoa_alert_deliveries`. If the
+secret is absent, notification delivery is skipped without failing ingestion.
+
+### Grafana Cloud
+
+Create a Grafana Cloud service account with data source and dashboard write
+permissions, then configure:
+
+- repository variable `GRAFANA_URL` (`https://your-stack.grafana.net`)
+- repository secret `GRAFANA_SERVICE_ACCOUNT_TOKEN`
+- optional repository secret `GRAFANA_DATABASE_URL` for a dedicated read-only
+  Neon role (falls back to `DATABASE_URL`)
+
+Run the `deploy-grafana` workflow to create or update the Neon data source and
+the dashboard. See [`grafana/README.md`](grafana/README.md) for the read-only
+database-role recommendation.
+
+### Pull-request CI
+
+Unit tests run on every pull request. To enable isolated dbt builds, install the
+Neon GitHub integration (or create an API key), then configure repository
+variable `NEON_PROJECT_ID` and secret `NEON_API_KEY`. CI creates a Neon branch,
+runs the full dbt build and tests, and deletes the branch even when the build
+fails. Forked pull requests run credential-free unit tests only.
 
 ## Design decisions
 
@@ -120,10 +159,16 @@ python scripts/run_dbt.py build # staging + marts + data tests
   constraint is an ingestion concern, not a modeling one.
 - **Calendar-aware.** The job checks Tradier's market calendar and no-ops on
   holidays instead of writing stale duplicate snapshots.
+- **Two serving modes.** GitHub Pages is a zero-runtime, dependency-free
+  snapshot; Grafana connects live to Neon for filtering and operational use.
+- **Idempotent notifications.** Discord delivery is recorded only after a
+  successful webhook response, so retries do not repeat alerts.
+- **Bounded storage.** A weekly workflow deletes raw chains and quotes older
+  than 90 days while preserving compact marts and alert history.
 
 ## Roadmap
 
 - [x] **Phase 1 — Ingestion**: Tradier → Neon raw, scheduled + idempotent
 - [x] **Phase 2 — Modeling**: dbt staging/marts, UOA flag logic, source freshness tests; weekly fundamentals (yfinance)
-- [ ] **Phase 3 — Serving**: Grafana dashboards + Discord alert on new UOA flags
-- [ ] **Phase 4 — Hardening**: dbt build in CI on PRs (Neon branch per PR), dbt docs on GitHub Pages, 90-day raw retention job
+- [x] **Phase 3 — Serving**: static HTML and Grafana dashboards + Discord alert on new UOA flags
+- [x] **Phase 4 — Hardening**: dbt build in CI on PRs (Neon branch per PR), dbt docs on GitHub Pages, 90-day raw retention job

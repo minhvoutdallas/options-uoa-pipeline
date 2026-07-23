@@ -47,3 +47,14 @@ CREATE TABLE IF NOT EXISTS raw.ingest_runs (
     status        text        NOT NULL DEFAULT 'running',
     detail        jsonb
 );
+
+-- Delivery ledger for idempotent Discord notifications. A flag is marked only
+-- after Discord accepts it, so workflow retries cannot duplicate alerts.
+CREATE TABLE IF NOT EXISTS raw.uoa_alert_deliveries (
+    snapshot_date date        NOT NULL,
+    underlying   text        NOT NULL,
+    option_type  text        NOT NULL,
+    alerted_at   timestamptz NOT NULL DEFAULT now(),
+    payload      jsonb       NOT NULL,
+    PRIMARY KEY (snapshot_date, underlying, option_type)
+);
